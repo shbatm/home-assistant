@@ -19,6 +19,7 @@ DOMAIN = 'envisalink'
 DATA_EVL = 'envisalink'
 
 CONF_CODE = 'code'
+CONF_CUSTOM_BYPASS = 'custom_bypass'
 CONF_EVL_KEEPALIVE = 'keepalive_interval'
 CONF_EVL_PORT = 'port'
 CONF_EVL_VERSION = 'evl_version'
@@ -60,6 +61,7 @@ CONFIG_SCHEMA = vol.Schema({
         vol.Required(CONF_USERNAME): cv.string,
         vol.Required(CONF_PASS): cv.string,
         vol.Optional(CONF_CODE): cv.string,
+        vol.Optional(CONF_CUSTOM_BYPASS): cv.string,
         vol.Optional(CONF_PANIC, default=DEFAULT_PANIC): cv.string,
         vol.Optional(CONF_ZONES): {vol.Coerce(int): ZONE_SCHEMA},
         vol.Optional(CONF_PARTITIONS): {vol.Coerce(int): PARTITION_SCHEMA},
@@ -96,6 +98,7 @@ async def async_setup(hass, config):
     host = conf.get(CONF_HOST)
     port = conf.get(CONF_EVL_PORT)
     code = conf.get(CONF_CODE)
+    custom_bypass = conf.get(CONF_CUSTOM_BYPASS)
     panel_type = conf.get(CONF_PANEL_TYPE)
     panic_type = conf.get(CONF_PANIC)
     version = conf.get(CONF_EVL_VERSION)
@@ -151,7 +154,7 @@ async def async_setup(hass, config):
     @callback
     def partition_updated_callback(data):
         """Handle partition changes thrown by evl (including alarms)."""
-        _LOGGER.debug("The envisalink sent a partition update event")
+        _LOGGER.debug("The envisalink sent a partition update event: %s", data)
         async_dispatcher_send(hass, SIGNAL_PARTITION_UPDATE, data)
 
     @callback
@@ -187,6 +190,7 @@ async def async_setup(hass, config):
             hass, 'alarm_control_panel', 'envisalink', {
                 CONF_PARTITIONS: partitions,
                 CONF_CODE: code,
+                CONF_CUSTOM_BYPASS: custom_bypass,
                 CONF_PANIC: panic_type
             }, config
         ))

@@ -1,5 +1,6 @@
 """Support for Envisalink-based alarm control panels (Honeywell/DSC)."""
 import logging
+import asyncio
 
 import voluptuous as vol
 
@@ -13,8 +14,9 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from . import (
-    CONF_CODE, CONF_PANIC, CONF_PARTITIONNAME, DATA_EVL, PARTITION_SCHEMA,
-    SIGNAL_KEYPAD_UPDATE, SIGNAL_PARTITION_UPDATE, EnvisalinkDevice)
+    CONF_CODE, CONF_CUSTOM_BYPASS, CONF_PANIC, CONF_PARTITIONNAME, DATA_EVL,
+    PARTITION_SCHEMA, SIGNAL_KEYPAD_UPDATE, SIGNAL_PARTITION_UPDATE,
+    EnvisalinkDevice)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ async def async_setup_platform(
     """Perform the setup for Envisalink alarm panels."""
     configured_partitions = discovery_info['partitions']
     code = discovery_info[CONF_CODE]
+    custom_bypass = discovery_info[CONF_CUSTOM_BYPASS]
     panic_type = discovery_info[CONF_PANIC]
 
     devices = []
@@ -38,7 +41,8 @@ async def async_setup_platform(
         device_config_data = PARTITION_SCHEMA(configured_partitions[part_num])
         device = EnvisalinkAlarm(
             hass, part_num, device_config_data[CONF_PARTITIONNAME], code,
-            panic_type, hass.data[DATA_EVL].alarm_state['partition'][part_num],
+            custom_bypass, panic_type,
+            hass.data[DATA_EVL].alarm_state['partition'][part_num],
             hass.data[DATA_EVL])
         devices.append(device)
 
@@ -66,11 +70,12 @@ async def async_setup_platform(
 class EnvisalinkAlarm(EnvisalinkDevice, alarm.AlarmControlPanel):
     """Representation of an Envisalink-based alarm panel."""
 
-    def __init__(self, hass, partition_number, alarm_name, code, panic_type,
-                 info, controller):
+    def __init__(self, hass, partition_number, alarm_name, code, custom_bypass,
+                 panic_type, info, controller):
         """Initialize the alarm panel."""
         self._partition_number = partition_number
         self._code = code
+        self._custom_bypass = custom_bypass
         self._panic_type = panic_type
 
         _LOGGER.debug("Setting up alarm: %s", alarm_name)
@@ -141,6 +146,18 @@ class EnvisalinkAlarm(EnvisalinkDevice, alarm.AlarmControlPanel):
         else:
             self.hass.data[DATA_EVL].arm_away_partition(
                 str(self._code), self._partition_number)
+
+    async def async_alarm_arm_custom_bypass(self, code=None):
+        """Send bypass and then arm command."""
+        if self._custom_bypass:
+            self.async_alarm_keypress(self._custom_bypass)
+            _LOGGER.debug("Envisalink sending custom bypass sequence: %s",
+                          self._custom_bypass)
+            await asyncio.sleep(2.5)
+            _LOGGER.debug("Envisalink sending arm away command.")
+            await self.async_alarm_arm_away(code)
+        else:
+            _LOGGER.debug("No 'custom_bypass' Code Provided in config.")
 
     async def async_alarm_trigger(self, code=None):
         """Alarm trigger command. Will be used to trigger a panic alarm."""
