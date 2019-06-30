@@ -252,11 +252,20 @@ class ISYBinarySensorHeartbeat(ISYDevice, BinarySensorDevice):
     """Representation of the battery state of an ISY994 sensor."""
 
     def __init__(self, node, parent_device) -> None:
-        """Initialize the ISY994 binary sensor device."""
+        """Initialize the ISY994 binary sensor device.
+
+        Computed state is set to UNKNOWN unless the ISY provided a valid
+        state. See notes above regarding ISY Sensor status on ISY restart.
+        If a valid state is provided (either on or off), the computed state in
+        HA is set to OFF (Normal). If the heartbeat is not received in 25 hours
+        then the computed state is set to ON (Low Battery).
+        """
         super().__init__(node)
-        self._computed_state = None
         self._parent_device = parent_device
         self._heartbeat_timer = None
+        self._computed_state = None
+        if not self.is_unknown():
+            self._computed_state = False
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the node and subnode event emitters."""
@@ -265,11 +274,14 @@ class ISYBinarySensorHeartbeat(ISYDevice, BinarySensorDevice):
         self._node.controlEvents.subscribe(
             self._heartbeat_node_control_handler)
 
-        # Start the timer on bootup, so we can change from UNKNOWN to ON
+        # Start the timer on bootup, so we can change from UNKNOWN to OFF
         self._restart_timer()
 
     def _heartbeat_node_control_handler(self, event: object) -> None:
-        """Update the heartbeat timestamp when an On event is sent."""
+        """Update the heartbeat timestamp when any ON/OFF event is sent.
+
+        The ISY uses both DON and DOF commands (alternating) for a heartbeat.
+        """
         if event in ['DON', 'DOF']:
             self.heartbeat()
 
@@ -296,13 +308,13 @@ class ISYBinarySensorHeartbeat(ISYDevice, BinarySensorDevice):
 
         @callback
         def timer_elapsed(now) -> None:
-            """Heartbeat missed; set state to indicate dead battery."""
+            """Heartbeat missed; set state to ON to indicate dead battery."""
             self._computed_state = True
             self._heartbeat_timer = None
             self.schedule_update_ha_state()
 
         point_in_time = dt_util.utcnow() + timedelta(hours=25)
-        _LOGGER.debug("Timer starting. Now: %s Then: %s",
+        _LOGGER.debug("Heartbeat timer starting. Now: %s Then: %s",
                       dt_util.utcnow(), point_in_time)
 
         self._heartbeat_timer = async_track_point_in_utc_time(
