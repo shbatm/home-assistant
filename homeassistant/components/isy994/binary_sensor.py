@@ -16,6 +16,8 @@ from . import ISY994_NODES, ISY994_PROGRAMS, ISY994_VARIABLES, ISYDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+SUPPORTED_DEVICE_CLASSES = ['moisture', 'opening', 'motion']
+
 ISY_DEVICE_TYPES = {
     'moisture': ['16.8', '16.13', '16.14'],
     'opening': ['16.9', '16.6', '16.7', '16.2', '16.17', '16.20', '16.21'],
@@ -48,9 +50,9 @@ def setup_platform(hass, config: ConfigType,
                           "was created for the parent. Skipping.",
                           node.nid, node.parent_nid)
         else:
-            device_type = _detect_device_type(node)
+            device_class, device_type = _detect_device_type(node)
             subnode_id = int(node.nid[-1], 16)
-            if device_type in ('opening', 'moisture'):
+            if device_class in ('opening', 'moisture'):
                 # These sensors use an optional "negative" subnode 2 to snag
                 # all state changes
                 if subnode_id == 2:
@@ -61,6 +63,24 @@ def setup_platform(hass, config: ConfigType,
                     device = ISYBinarySensorHeartbeat(node, parent_device)
                     parent_device.add_heartbeat_device(device)
                     devices.append(device)
+            elif device_class == 'motion':
+                if device_type is not None and \
+                                  device_type.startswith('16.1.65.'):
+                    # Special case for Insteon Motion Sensor (1st Gen):
+                    if subnode_id == 2:
+                        # Subnode 2 is the Dusk/Dawn sensor
+                        device = ISYBinarySensorDevice(node, 'light')
+                        devices.append(device)
+                    elif subnode_id == 3:
+                        # Subnode 3 is the low battery node
+                        # Node never reports status until battery is low so
+                        # the intial state is forced "OFF"/"NORMAL" if the
+                        # parent device has a valid state.
+                        inital_state = None if parent_device.is_unknown() \
+                                             else False
+                        device = ISYBinarySensorDevice(node, 'battery',
+                                                       inital_state)
+                        devices.append(device)
             else:
                 # We don't yet have any special logic for other sensor types,
                 # so add the nodes as individual devices
@@ -76,19 +96,19 @@ def setup_platform(hass, config: ConfigType,
     add_entities(devices)
 
 
-def _detect_device_type(node) -> str:
+def _detect_device_type(node) -> (str, str):
     try:
         device_type = node.type
     except AttributeError:
         # The type attribute didn't exist in the ISY's API response
-        return None
+        return (None, None)
 
-    split_type = device_type.split('.')
-    for device_class, ids in ISY_DEVICE_TYPES.items():
-        if '{}.{}'.format(split_type[0], split_type[1]) in ids:
-            return device_class
+    for device_class in SUPPORTED_DEVICE_CLASSES:
+        if any([device_type.startswith(t) for t in
+                set(ISY_DEVICE_TYPES[device_class])]):
+            return device_class, device_type
 
-    return None
+    return (None, None)
 
 
 def _is_val_unknown(val):
@@ -105,15 +125,20 @@ class ISYBinarySensorDevice(ISYDevice, BinarySensorDevice):
     entity and handles both ways that ISY binary sensors can work.
     """
 
-    def __init__(self, node) -> None:
+    def __init__(self, node, force_device_class=None,
+                 unknown_state=None) -> None:
         """Initialize the ISY994 binary sensor device."""
         super().__init__(node)
         self._negative_node = None
         self._heartbeat_device = None
-        self._device_class_from_type = _detect_device_type(self._node)
+        if force_device_class is not None:
+            self._device_class_from_type = force_device_class
+        else:
+            self._device_class_from_type, _ = \
+                _detect_device_type(self._node)
         # pylint: disable=protected-access
         if _is_val_unknown(self._node.status._val):
-            self._computed_state = None
+            self._computed_state = unknown_state
             self._status_was_unknown = True
         else:
             self._computed_state = bool(self._node.status._val)
