@@ -434,8 +434,7 @@ class ISYBinarySensorVariableDevice(ISYDevice, BinarySensorDevice):
     def device_state_attributes(self) -> Dict:
         """Get the state attributes for the device."""
         attr = {}
-        attr["Variable Type"] = "State" if self._vtype == 2 else "Integer"
-        attr["Init Value"] = int(self._node.init)
+        attr['init_value'] = int(self._node.init)
         return attr
 
     @property
