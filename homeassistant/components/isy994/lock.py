@@ -33,10 +33,6 @@ def setup_platform(hass, config: ConfigType,
 class ISYLockDevice(ISYDevice, LockDevice):
     """Representation of an ISY994 lock device."""
 
-    def __init__(self, node) -> None:
-        """Initialize the ISY994 lock device."""
-        super().__init__(node)
-
     @property
     def is_locked(self) -> bool:
         """Get whether the lock is in locked state."""
