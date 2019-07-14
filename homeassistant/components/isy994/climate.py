@@ -67,7 +67,7 @@ class ISYThermostatDevice(ISYDevice, ClimateDevice):
 
         target_temp_low = self._node.aux_properties.get(ISY_TARGET_TEMP_LOW)
         if target_temp_low:
-            self._target_temp_high = \
+            self._target_temp_low = \
                 self.fix_temp(target_temp_low.get('value'))
 
         hvac_mode = self._node.aux_properties.get(ISY_HVAC_MODE, None)
