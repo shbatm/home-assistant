@@ -5,8 +5,8 @@ from typing import Callable, Optional
 
 from homeassistant.components.binary_sensor import DOMAIN, BinarySensorDevice
 from homeassistant.const import (
-    CONF_DEVICE_CLASS, CONF_ICON, CONF_ID, CONF_NAME, CONF_TYPE, STATE_OFF,
-    STATE_ON)
+    CONF_DEVICE_CLASS, CONF_ICON, CONF_ID, CONF_NAME, CONF_PAYLOAD_OFF,
+    CONF_PAYLOAD_ON, CONF_TYPE, STATE_OFF, STATE_ON)
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.typing import ConfigType, Dict
@@ -427,8 +427,8 @@ class ISYBinarySensorVariableDevice(ISYDevice, BinarySensorDevice):
         self._name = vcfg.get(CONF_NAME, vname)
         self._vtype = vcfg.get(CONF_TYPE)
         self._vid = vcfg.get(CONF_ID)
-        self._on_value = vcfg.get(STATE_ON)
-        self._off_value = vcfg.get(STATE_OFF)
+        self._on_value = vcfg.get(CONF_PAYLOAD_ON)
+        self._off_value = vcfg.get(CONF_PAYLOAD_OFF)
         self._change_handler = None
         self._init_change_handler = None
 

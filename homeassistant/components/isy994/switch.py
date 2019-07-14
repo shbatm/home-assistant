@@ -4,7 +4,8 @@ from typing import Callable
 
 from homeassistant.components.switch import DOMAIN, SwitchDevice
 from homeassistant.const import (
-    CONF_ICON, CONF_ID, CONF_NAME, CONF_TYPE, STATE_OFF, STATE_ON)
+    CONF_ICON, CONF_ID, CONF_NAME, CONF_PAYLOAD_OFF, CONF_PAYLOAD_ON,
+    CONF_TYPE)
 from homeassistant.helpers.typing import ConfigType, Dict
 
 from . import ISYDevice
@@ -83,8 +84,8 @@ class ISYSwitchVariableDevice(ISYDevice, SwitchDevice):
         self._name = vcfg.get(CONF_NAME, vname)
         self._vtype = vcfg.get(CONF_TYPE)
         self._vid = vcfg.get(CONF_ID)
-        self._on_value = vcfg.get(STATE_ON)
-        self._off_value = vcfg.get(STATE_OFF)
+        self._on_value = vcfg.get(CONF_PAYLOAD_ON)
+        self._off_value = vcfg.get(CONF_PAYLOAD_OFF)
         self._change_handler = None
         self._init_change_handler = None
 
