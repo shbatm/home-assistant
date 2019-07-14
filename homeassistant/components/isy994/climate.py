@@ -58,7 +58,7 @@ class ISYThermostatDevice(ISYDevice, ClimateDevice):
         current_humidity = self._node.aux_properties.get(
             ISY_CURRENT_HUMIDITY)
         if current_humidity:
-            self._current_humidity = current_humidity.get('value', 0)
+            self._current_humidity = int(current_humidity.get('value', 0))
 
         target_temp_high = self._node.aux_properties.get(ISY_TARGET_TEMP_HIGH)
         if target_temp_high:
@@ -70,9 +70,10 @@ class ISYThermostatDevice(ISYDevice, ClimateDevice):
             self._target_temp_low = \
                 self.fix_temp(target_temp_low.get('value'))
 
-        hvac_mode = self._node.aux_properties.get(ISY_HVAC_MODE, None)
+        hvac_mode = self._node.aux_properties.get(ISY_HVAC_MODE)
         if hvac_mode:
-            self._hvac_mode = UOM_TO_STATES['98'].get(hvac_mode.get('value'))
+            self._hvac_mode = UOM_TO_STATES['98']. \
+                get(str(hvac_mode.get('value')))
 
         self._node.controlEvents.subscribe(self._node_control_handler)
         await super().async_added_to_hass()
@@ -90,12 +91,11 @@ class ISYThermostatDevice(ISYDevice, ClimateDevice):
             need to listen for it here.
         """
         if event.event == ISY_FAN_MODE:
-            self._fan_mode = UOM_TO_STATES['99'].get(str(event.nval), None)
+            self._fan_mode = UOM_TO_STATES['99'].get(str(event.nval))
         elif event.event == ISY_HVAC_STATE:
-            self._hvac_action = UOM_TO_STATES['66'].get(str(event.nval),
-                                                        None)
+            self._hvac_action = UOM_TO_STATES['66'].get(str(event.nval))
         elif event.event == ISY_HVAC_MODE:
-            self._hvac_mode = UOM_TO_STATES['98'].get(str(event.nval), None)
+            self._hvac_mode = UOM_TO_STATES['98'].get(str(event.nval))
         elif event.event == ISY_UOM:
             if int(event.nval) == 1:
                 self._temp_unit = TEMP_CELSIUS
@@ -104,9 +104,9 @@ class ISYThermostatDevice(ISYDevice, ClimateDevice):
         elif event.event == ISY_CURRENT_HUMIDITY:
             self._current_humidity = int(event.nval)
         elif event.event == ISY_TARGET_TEMP_HIGH:
-            self._target_temp_high = self.fix_temp(int(event.nval))
+            self._target_temp_high = self.fix_temp(event.nval)
         elif event.event == ISY_TARGET_TEMP_LOW:
-            self._target_temp_low = self.fix_temp(int(event.nval))
+            self._target_temp_low = self.fix_temp(event.nval)
         self.schedule_update_ha_state()
 
     @property
