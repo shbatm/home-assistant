@@ -5,20 +5,24 @@ from typing import Callable
 from homeassistant.components.light import DOMAIN, SUPPORT_BRIGHTNESS, Light
 from homeassistant.helpers.typing import ConfigType
 
-from . import ISY994_NODES, ISYDevice
+from . import ISYDevice
+from .const import ISY994_NODES
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def setup_platform(
-    hass, config: ConfigType, add_entities: Callable[[list], None], discovery_info=None
+async def async_setup_platform(
+    hass,
+    config: ConfigType,
+    async_add_entities: Callable[[list], None],
+    discovery_info=None,
 ):
     """Set up the ISY994 light platform."""
     devices = []
     for node in hass.data[ISY994_NODES][DOMAIN]:
         devices.append(ISYLightDevice(node))
 
-    add_entities(devices)
+    async_add_entities(devices)
 
 
 class ISYLightDevice(ISYDevice, Light):
