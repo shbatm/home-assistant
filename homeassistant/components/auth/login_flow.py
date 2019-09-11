@@ -76,7 +76,6 @@ from homeassistant.components.http.data_validator import RequestDataValidator
 from homeassistant.components.http.view import HomeAssistantView
 from . import indieauth
 
-
 async def async_setup(hass, store_result):
     """Component to allow users to login."""
     hass.http.register_view(AuthProvidersView)
@@ -178,6 +177,7 @@ class LoginFlowIndexView(HomeAssistantView):
                 context={
                     "ip_address": request[KEY_REAL_IP],
                     "credential_only": data.get("type") == "link_user",
+                    "headers": request.headers,
                 },
             )
         except data_entry_flow.UnknownHandler:
