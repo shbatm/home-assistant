@@ -1,7 +1,5 @@
 """Sorting helpers for ISY994 device classifications."""
-from collections import namedtuple
-
-from PyISY.Nodes import Group
+from pyisy.constants import PROTO_GROUP, PROTO_INSTEON, PROTO_PROGRAM
 
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR
 from homeassistant.components.fan import DOMAIN as FAN
@@ -13,7 +11,6 @@ from .const import (
     _LOGGER,
     ISY994_NODES,
     ISY994_PROGRAMS,
-    ISY994_WEATHER,
     ISY_GROUP_PLATFORM,
     KEY_ACTIONS,
     KEY_FOLDER,
@@ -23,8 +20,6 @@ from .const import (
     SUPPORTED_PLATFORMS,
     SUPPORTED_PROGRAM_PLATFORMS,
 )
-
-WeatherNode = namedtuple("WeatherNode", ("status", "name", "uom"))
 
 
 def _check_for_node_def(
@@ -60,6 +55,8 @@ def _check_for_insteon_type(
     works for Insteon device. "Node Server" (v5+) and Z-Wave and others will
     not have a type.
     """
+    if not hasattr(node, "protocol") or node.protocol != PROTO_INSTEON:
+        return False
     if not hasattr(node, "type") or node.type is None:
         # Node doesn't have a type (non-Insteon device most likely)
         return False
@@ -177,7 +174,7 @@ def _categorize_nodes(
             # Don't import this node as a device at all
             continue
 
-        if isinstance(node, Group):
+        if hasattr(node, "protocol") and node.protocol == PROTO_GROUP:
             hass.data[ISY994_NODES][ISY_GROUP_PLATFORM].append(node)
             continue
 
@@ -217,10 +214,10 @@ def _categorize_programs(hass: HomeAssistantType, programs: dict) -> None:
                 entity_folder = folder[node_id]
                 try:
                     status = entity_folder[KEY_STATUS]
-                    assert status.dtype == "program", "Not a program"
+                    assert status.dtype == PROTO_PROGRAM, "Not a program"
                     if platform != BINARY_SENSOR:
                         actions = entity_folder[KEY_ACTIONS]
-                        assert actions.dtype == "program", "Not a program"
+                        assert actions.dtype == PROTO_PROGRAM, "Not a program"
                     else:
                         actions = None
                 except (AttributeError, KeyError, AssertionError):
@@ -233,18 +230,3 @@ def _categorize_programs(hass: HomeAssistantType, programs: dict) -> None:
 
                 entity = (entity_folder.name, status, actions)
                 hass.data[ISY994_PROGRAMS][platform].append(entity)
-
-
-def _categorize_weather(hass: HomeAssistantType, climate) -> None:
-    """Categorize the ISY994 weather data."""
-    climate_attrs = dir(climate)
-    weather_nodes = [
-        WeatherNode(
-            getattr(climate, attr),
-            attr.replace("_", " "),
-            getattr(climate, f"{attr}_units"),
-        )
-        for attr in climate_attrs
-        if f"{attr}_units" in climate_attrs
-    ]
-    hass.data[ISY994_WEATHER].extend(weather_nodes)
