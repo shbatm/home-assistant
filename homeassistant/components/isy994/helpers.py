@@ -1,16 +1,18 @@
 """Sorting helpers for ISY994 device classifications."""
-from pyisy.constants import PROTO_GROUP, PROTO_INSTEON, PROTO_PROGRAM
+from pyisy.constants import PROTO_GROUP, PROTO_INSTEON, PROTO_PROGRAM, PROTO_ZWAVE
 
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR
 from homeassistant.components.fan import DOMAIN as FAN
 from homeassistant.components.light import DOMAIN as LIGHT
 from homeassistant.components.sensor import DOMAIN as SENSOR
+from homeassistant.components.switch import DOMAIN as SWITCH
 from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
     _LOGGER,
     ISY994_NODES,
     ISY994_PROGRAMS,
+    ISY_BIN_SENS_DEVICE_TYPES,
     ISY_GROUP_PLATFORM,
     KEY_ACTIONS,
     KEY_FOLDER,
@@ -19,6 +21,7 @@ from .const import (
     NODE_FILTERS,
     SUPPORTED_PLATFORMS,
     SUPPORTED_PROGRAM_PLATFORMS,
+    ZWAVE_BIN_SENS_DEVICE_TYPES,
 )
 
 
@@ -42,7 +45,6 @@ def _check_for_node_def(
             hass.data[ISY994_NODES][platform].append(node)
             return True
 
-    _LOGGER.warning("Unsupported node: %s, type: %s", node.name, node.type)
     return False
 
 
@@ -71,12 +73,63 @@ def _check_for_insteon_type(
             ]
         ):
 
-            # Hacky special-case just for FanLinc, which has a light module
-            # as one of its nodes. Note that this special-case is not necessary
+            # Hacky special-cases for certain devices with different platforms
+            # included as subnodes. Note that special-cases are not necessary
             # on ISY 5.x firmware as it uses the superior NodeDefs method
-            if platform == FAN and int(node.nid[-1]) == 1:
+
+            # FanLinc, which has a light module as one of its nodes.
+            if platform == FAN and str(node.address[-1]) in ["1"]:
                 hass.data[ISY994_NODES][LIGHT].append(node)
                 return True
+
+            # IOLincs which have a sensor and relay on 2 different nodes
+            if (
+                platform == BINARY_SENSOR
+                and device_type.startswith("7.")
+                and str(node.address[-1]) in ["2"]
+            ):
+                hass.data[ISY994_NODES][SWITCH].append(node)
+                return True
+
+            # Smartenit EZIO2X4
+            if (
+                platform == SWITCH
+                and device_type.startswith("7.3.255.")
+                and str(node.address[-1]) in ["9", "A", "B", "C"]
+            ):
+                hass.data[ISY994_NODES][BINARY_SENSOR].append(node)
+                return True
+
+            hass.data[ISY994_NODES][platform].append(node)
+            return True
+
+    return False
+
+
+def _check_for_zwave_cat(
+    hass: HomeAssistantType, node, single_platform: str = None
+) -> bool:
+    """Check if the node matches the ISY Z-Wave Category for any platforms.
+
+    This is for (presumably) every version of the ISY firmware, but only
+    works for Z-Wave Devices with the devtype.cat property.
+    """
+    if not hasattr(node, "protocol") or node.protocol != PROTO_ZWAVE:
+        return False
+
+    if not hasattr(node, "zwave_props") or node.zwave_props is None:
+        # Node doesn't have a device type category (non-Z-Wave device)
+        return False
+
+    device_type = node.zwave_props.category
+    platforms = SUPPORTED_PLATFORMS if not single_platform else [single_platform]
+    for platform in platforms:
+        if any(
+            [
+                device_type.startswith(t)
+                for t in set(NODE_FILTERS[platform]["zwave_cat"])
+            ]
+        ):
 
             hass.data[ISY994_NODES][platform].append(node)
             return True
@@ -194,6 +247,8 @@ def _categorize_nodes(
             continue
         if _check_for_insteon_type(hass, node):
             continue
+        if _check_for_zwave_cat(hass, node):
+            continue
         if _check_for_uom_id(hass, node):
             continue
         if _check_for_states_in_uom(hass, node):
@@ -230,3 +285,29 @@ def _categorize_programs(hass: HomeAssistantType, programs: dict) -> None:
 
                 entity = (entity_folder.name, status, actions)
                 hass.data[ISY994_PROGRAMS][platform].append(entity)
+
+
+def _detect_device_type_and_class(node) -> (str, str):
+    try:
+        device_type = node.type
+    except AttributeError:
+        # The type attribute didn't exist in the ISY's API response
+        return (None, None)
+
+    # Z-Wave Devices:
+    if node.protocol == PROTO_ZWAVE:
+        device_type = f"Z{node.zwave_props.category}"
+        for device_class in [*ZWAVE_BIN_SENS_DEVICE_TYPES]:
+            if node.zwave_props.category in ZWAVE_BIN_SENS_DEVICE_TYPES[device_class]:
+                return device_class, device_type
+    else:  # Other devices (incl Insteon.)
+        for device_class in [*ISY_BIN_SENS_DEVICE_TYPES]:
+            if any(
+                [
+                    device_type.startswith(t)
+                    for t in set(ISY_BIN_SENS_DEVICE_TYPES[device_class])
+                ]
+            ):
+                return device_class, device_type
+
+    return (None, device_type)
