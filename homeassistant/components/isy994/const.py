@@ -7,6 +7,7 @@ from homeassistant.components.climate.const import (
     CURRENT_HVAC_FAN,
     CURRENT_HVAC_HEAT,
     CURRENT_HVAC_IDLE,
+    DOMAIN as CLIMATE,
     FAN_AUTO,
     FAN_HIGH,
     FAN_MEDIUM,
@@ -95,7 +96,7 @@ KEY_FOLDER = "folder"
 KEY_MY_PROGRAMS = "My Programs"
 KEY_STATUS = "status"
 
-SUPPORTED_PLATFORMS = [BINARY_SENSOR, SENSOR, LOCK, FAN, COVER, LIGHT, SWITCH]
+SUPPORTED_PLATFORMS = [BINARY_SENSOR, SENSOR, LOCK, FAN, COVER, LIGHT, SWITCH, CLIMATE]
 SUPPORTED_PROGRAM_PLATFORMS = [BINARY_SENSOR, LOCK, FAN, COVER, SWITCH]
 
 SUPPORTED_BIN_SENS_CLASSES = ["moisture", "opening", "motion", "climate"]
@@ -213,6 +214,13 @@ NODE_FILTERS = {
         ],
         "insteon_type": ["0.16.", "2.", "7.3.255.", "9.10.", "9.11.", "113."],
         "zwave_cat": ["121", "122", "123", "137", "141", "147"],
+    },
+    CLIMATE: {
+        "uom": ["2"],
+        "states": ["heating", "cooling", "idle", "fan_only", "off"],
+        "node_def_id": ["TempLinc", "Thermostat"],
+        "insteon_type": ["4.8", "5."],
+        "zwave_cat": ["140"],
     },
 }
 
@@ -475,6 +483,26 @@ UOM_TO_STATES = {
     },
     "99": {7: FAN_ON, 8: FAN_AUTO},  # Insteon Thermostat Fan Mode
 }
+
+ISY_HVAC_MODES = [
+    HVAC_MODE_OFF,
+    HVAC_MODE_HEAT,
+    HVAC_MODE_COOL,
+    HVAC_MODE_HEAT_COOL,
+    HVAC_MODE_AUTO,
+    HVAC_MODE_FAN_ONLY,
+]
+
+HA_HVAC_TO_ISY = {
+    HVAC_MODE_OFF: "off",
+    HVAC_MODE_HEAT: "heat",
+    HVAC_MODE_COOL: "cool",
+    HVAC_MODE_HEAT_COOL: "auto",
+    HVAC_MODE_FAN_ONLY: "fan_only",
+    HVAC_MODE_AUTO: "program_auto",
+}
+
+HA_FAN_TO_ISY = {FAN_ON: "on", FAN_AUTO: "auto"}
 
 ISY_BIN_SENS_DEVICE_TYPES = {
     "moisture": ["16.8.", "16.13.", "16.14."],
