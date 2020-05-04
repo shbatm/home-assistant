@@ -82,6 +82,7 @@ MANUFACTURER = "Universal Devices, Inc"
 
 CONF_IGNORE_STRING = "ignore_string"
 CONF_SENSOR_STRING = "sensor_string"
+CONF_VAR_SENSOR_STRING = "variable_sensor_string"
 CONF_TLS_VER = "tls"
 CONF_RESTORE_LIGHT_STATE = "restore_light_state"
 
@@ -108,6 +109,7 @@ ISY_GROUP_PLATFORM = SWITCH
 ISY994_ISY = "isy"
 ISY994_NODES = "isy994_nodes"
 ISY994_PROGRAMS = "isy994_programs"
+ISY994_VARIABLES = "isy994_variables"
 
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 

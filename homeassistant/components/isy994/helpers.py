@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     ISY994_NODES,
     ISY994_PROGRAMS,
+    ISY994_VARIABLES,
     ISY_BIN_SENS_DEVICE_TYPES,
     ISY_GROUP_PLATFORM,
     KEY_ACTIONS,
@@ -290,6 +291,21 @@ def _categorize_programs(hass_isy_data: dict, programs: dict) -> None:
 
                 entity = (entity_folder.name, status, actions)
                 hass_isy_data[ISY994_PROGRAMS][platform].append(entity)
+
+
+def _categorize_variables(hass_isy_data: dict, variables, identifier: str) -> None:
+    """Gather the ISY994 Variables to be added as sensors."""
+    try:
+        var_to_add = [
+            (vtype, vname, vid)
+            for (vtype, vname, vid) in variables.children
+            if identifier in vname
+        ]
+    except KeyError as err:
+        _LOGGER.error("Error adding ISY Variables: %s", err)
+    else:
+        for vtype, vname, vid in var_to_add:
+            hass_isy_data[ISY994_VARIABLES].append((vname, variables[vtype][vid]))
 
 
 def _detect_device_type_and_class(node) -> (str, str):
