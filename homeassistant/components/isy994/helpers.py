@@ -1,4 +1,5 @@
 """Sorting helpers for ISY994 device classifications."""
+
 from pyisy.constants import PROTO_GROUP, PROTO_INSTEON, PROTO_PROGRAM, PROTO_ZWAVE
 
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR
@@ -6,10 +7,11 @@ from homeassistant.components.fan import DOMAIN as FAN
 from homeassistant.components.light import DOMAIN as LIGHT
 from homeassistant.components.sensor import DOMAIN as SENSOR
 from homeassistant.components.switch import DOMAIN as SWITCH
-from homeassistant.helpers.typing import HomeAssistantType
+from homeassistant.helpers.entity_registry import async_get_registry
 
 from .const import (
     _LOGGER,
+    DOMAIN,
     ISY994_NODES,
     ISY994_PROGRAMS,
     ISY_BIN_SENS_DEVICE_TYPES,
@@ -25,9 +27,7 @@ from .const import (
 )
 
 
-def _check_for_node_def(
-    hass: HomeAssistantType, node, single_platform: str = None
-) -> bool:
+def _check_for_node_def(hass_isy_data: dict, node, single_platform: str = None) -> bool:
     """Check if the node matches the node_def_id for any platforms.
 
     This is only present on the 5.0 ISY firmware, and is the most reliable
@@ -42,14 +42,14 @@ def _check_for_node_def(
     platforms = SUPPORTED_PLATFORMS if not single_platform else [single_platform]
     for platform in platforms:
         if node_def_id in NODE_FILTERS[platform]["node_def_id"]:
-            hass.data[ISY994_NODES][platform].append(node)
+            hass_isy_data[ISY994_NODES][platform].append(node)
             return True
 
     return False
 
 
 def _check_for_insteon_type(
-    hass: HomeAssistantType, node, single_platform: str = None
+    hass_isy_data: dict, node, single_platform: str = None
 ) -> bool:
     """Check if the node matches the Insteon type for any platforms.
 
@@ -79,7 +79,7 @@ def _check_for_insteon_type(
 
             # FanLinc, which has a light module as one of its nodes.
             if platform == FAN and str(node.address[-1]) in ["1"]:
-                hass.data[ISY994_NODES][LIGHT].append(node)
+                hass_isy_data[ISY994_NODES][LIGHT].append(node)
                 return True
 
             # IOLincs which have a sensor and relay on 2 different nodes
@@ -88,7 +88,7 @@ def _check_for_insteon_type(
                 and device_type.startswith("7.")
                 and str(node.address[-1]) in ["2"]
             ):
-                hass.data[ISY994_NODES][SWITCH].append(node)
+                hass_isy_data[ISY994_NODES][SWITCH].append(node)
                 return True
 
             # Smartenit EZIO2X4
@@ -97,17 +97,17 @@ def _check_for_insteon_type(
                 and device_type.startswith("7.3.255.")
                 and str(node.address[-1]) in ["9", "A", "B", "C"]
             ):
-                hass.data[ISY994_NODES][BINARY_SENSOR].append(node)
+                hass_isy_data[ISY994_NODES][BINARY_SENSOR].append(node)
                 return True
 
-            hass.data[ISY994_NODES][platform].append(node)
+            hass_isy_data[ISY994_NODES][platform].append(node)
             return True
 
     return False
 
 
 def _check_for_zwave_cat(
-    hass: HomeAssistantType, node, single_platform: str = None
+    hass_isy_data: dict, node, single_platform: str = None
 ) -> bool:
     """Check if the node matches the ISY Z-Wave Category for any platforms.
 
@@ -131,14 +131,14 @@ def _check_for_zwave_cat(
             ]
         ):
 
-            hass.data[ISY994_NODES][platform].append(node)
+            hass_isy_data[ISY994_NODES][platform].append(node)
             return True
 
     return False
 
 
 def _check_for_uom_id(
-    hass: HomeAssistantType, node, single_platform: str = None, uom_list: list = None
+    hass_isy_data: dict, node, single_platform: str = None, uom_list: list = None
 ) -> bool:
     """Check if a node's uom matches any of the platforms uom filter.
 
@@ -153,20 +153,20 @@ def _check_for_uom_id(
 
     if uom_list:
         if node_uom.intersection(uom_list):
-            hass.data[ISY994_NODES][single_platform].append(node)
+            hass_isy_data[ISY994_NODES][single_platform].append(node)
             return True
     else:
         platforms = SUPPORTED_PLATFORMS if not single_platform else [single_platform]
         for platform in platforms:
             if node_uom.intersection(NODE_FILTERS[platform]["uom"]):
-                hass.data[ISY994_NODES][platform].append(node)
+                hass_isy_data[ISY994_NODES][platform].append(node)
                 return True
 
     return False
 
 
 def _check_for_states_in_uom(
-    hass: HomeAssistantType, node, single_platform: str = None, states_list: list = None
+    hass_isy_data: dict, node, single_platform: str = None, states_list: list = None
 ) -> bool:
     """Check if a list of uoms matches two possible filters.
 
@@ -182,23 +182,23 @@ def _check_for_states_in_uom(
 
     if states_list:
         if node_uom == set(states_list):
-            hass.data[ISY994_NODES][single_platform].append(node)
+            hass_isy_data[ISY994_NODES][single_platform].append(node)
             return True
     else:
         platforms = SUPPORTED_PLATFORMS if not single_platform else [single_platform]
         for platform in platforms:
             if node_uom == set(NODE_FILTERS[platform]["states"]):
-                hass.data[ISY994_NODES][platform].append(node)
+                hass_isy_data[ISY994_NODES][platform].append(node)
                 return True
 
     return False
 
 
-def _is_sensor_a_binary_sensor(hass: HomeAssistantType, node) -> bool:
+def _is_sensor_a_binary_sensor(hass_isy_data: dict, node) -> bool:
     """Determine if the given sensor node should be a binary_sensor."""
-    if _check_for_node_def(hass, node, single_platform=BINARY_SENSOR):
+    if _check_for_node_def(hass_isy_data, node, single_platform=BINARY_SENSOR):
         return True
-    if _check_for_insteon_type(hass, node, single_platform=BINARY_SENSOR):
+    if _check_for_insteon_type(hass_isy_data, node, single_platform=BINARY_SENSOR):
         return True
 
     # For the next two checks, we're providing our own set of uoms that
@@ -206,11 +206,11 @@ def _is_sensor_a_binary_sensor(hass: HomeAssistantType, node) -> bool:
     # checks in the context of already knowing that this is definitely a
     # sensor device.
     if _check_for_uom_id(
-        hass, node, single_platform=BINARY_SENSOR, uom_list=["2", "78"]
+        hass_isy_data, node, single_platform=BINARY_SENSOR, uom_list=["2", "78"]
     ):
         return True
     if _check_for_states_in_uom(
-        hass, node, single_platform=BINARY_SENSOR, states_list=["on", "off"]
+        hass_isy_data, node, single_platform=BINARY_SENSOR, states_list=["on", "off"]
     ):
         return True
 
@@ -218,7 +218,7 @@ def _is_sensor_a_binary_sensor(hass: HomeAssistantType, node) -> bool:
 
 
 def _categorize_nodes(
-    hass: HomeAssistantType, nodes, ignore_identifier: str, sensor_identifier: str
+    hass_isy_data: dict, nodes, ignore_identifier: str, sensor_identifier: str
 ) -> None:
     """Sort the nodes to their proper platforms."""
     for (path, node) in nodes:
@@ -228,34 +228,33 @@ def _categorize_nodes(
             continue
 
         if hasattr(node, "protocol") and node.protocol == PROTO_GROUP:
-            hass.data[ISY994_NODES][ISY_GROUP_PLATFORM].append(node)
+            hass_isy_data[ISY994_NODES][ISY_GROUP_PLATFORM].append(node)
             continue
 
         if sensor_identifier in path or sensor_identifier in node.name:
             # User has specified to treat this as a sensor. First we need to
             # determine if it should be a binary_sensor.
-            if _is_sensor_a_binary_sensor(hass, node):
+            if _is_sensor_a_binary_sensor(hass_isy_data, node):
                 continue
-
-            hass.data[ISY994_NODES][SENSOR].append(node)
+            hass_isy_data[ISY994_NODES][SENSOR].append(node)
             continue
 
         # We have a bunch of different methods for determining the device type,
         # each of which works with different ISY firmware versions or device
         # family. The order here is important, from most reliable to least.
-        if _check_for_node_def(hass, node):
+        if _check_for_node_def(hass_isy_data, node):
             continue
-        if _check_for_insteon_type(hass, node):
+        if _check_for_insteon_type(hass_isy_data, node):
             continue
-        if _check_for_zwave_cat(hass, node):
+        if _check_for_zwave_cat(hass_isy_data, node):
             continue
-        if _check_for_uom_id(hass, node):
+        if _check_for_uom_id(hass_isy_data, node):
             continue
-        if _check_for_states_in_uom(hass, node):
+        if _check_for_states_in_uom(hass_isy_data, node):
             continue
 
 
-def _categorize_programs(hass: HomeAssistantType, programs: dict) -> None:
+def _categorize_programs(hass_isy_data: dict, programs: dict) -> None:
     """Categorize the ISY994 programs."""
     for platform in SUPPORTED_PROGRAM_PLATFORMS:
         try:
@@ -284,7 +283,7 @@ def _categorize_programs(hass: HomeAssistantType, programs: dict) -> None:
                     continue
 
                 entity = (entity_folder.name, status, actions)
-                hass.data[ISY994_PROGRAMS][platform].append(entity)
+                hass_isy_data[ISY994_PROGRAMS][platform].append(entity)
 
 
 def _detect_device_type_and_class(node) -> (str, str):
@@ -311,3 +310,33 @@ def _detect_device_type_and_class(node) -> (str, str):
                 return device_class, device_type
 
     return (None, device_type)
+
+
+async def migrate_old_unique_ids(hass, platform, devices):
+    """Migrate to new controller-specific unique ids."""
+    registry = await async_get_registry(hass)
+
+    for device in devices:
+        old_entity_id = registry.async_get_entity_id(
+            platform, DOMAIN, device.old_unique_id
+        )
+        if old_entity_id is not None:
+            _LOGGER.debug(
+                "Migrating unique_id from [%s] to [%s]",
+                device.old_unique_id,
+                device.unique_id,
+            )
+            registry.async_update_entity(old_entity_id, new_unique_id=device.unique_id)
+
+        old_entity_id_2 = registry.async_get_entity_id(
+            platform, DOMAIN, device.unique_id.replace(":", "")
+        )
+        if old_entity_id_2 is not None:
+            _LOGGER.debug(
+                "Migrating unique_id from [%s] to [%s]",
+                device.unique_id.replace(":", ""),
+                device.unique_id,
+            )
+            registry.async_update_entity(
+                old_entity_id_2, new_unique_id=device.unique_id
+            )

@@ -8,27 +8,30 @@ from homeassistant.components.binary_sensor import (
     DOMAIN as BINARY_SENSOR,
     BinarySensorEntity,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNKNOWN
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_point_in_utc_time
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.typing import HomeAssistantType
 from homeassistant.util import dt as dt_util
 
-from . import ISY994_NODES, ISY994_PROGRAMS
-from .const import _LOGGER
+from .const import _LOGGER, DOMAIN as ISY994_DOMAIN, ISY994_NODES, ISY994_PROGRAMS
 from .entity import ISYNodeEntity, ISYProgramEntity
-from .helpers import _detect_device_type_and_class
+from .helpers import _detect_device_type_and_class, migrate_old_unique_ids
 
 
-def setup_platform(
-    hass, config: ConfigType, add_entities: Callable[[list], None], discovery_info=None
-):
+async def async_setup_entry(
+    hass: HomeAssistantType,
+    entry: ConfigEntry,
+    async_add_entities: Callable[[list], None],
+) -> bool:
     """Set up the ISY994 binary sensor platform."""
     devices = []
     devices_by_address = {}
     child_nodes = []
 
-    for node in hass.data[ISY994_NODES][BINARY_SENSOR]:
+    hass_isy_data = hass.data[ISY994_DOMAIN][entry.entry_id]
+    for node in hass_isy_data[ISY994_NODES][BINARY_SENSOR]:
         device_class, device_type = _detect_device_type_and_class(node)
         if node.parent_node is None or node.protocol != PROTO_INSTEON:
             device = ISYBinarySensorEntity(node, device_class)
@@ -121,10 +124,11 @@ def setup_platform(
         device = ISYBinarySensorEntity(node, device_class)
         devices.append(device)
 
-    for name, status, _ in hass.data[ISY994_PROGRAMS][BINARY_SENSOR]:
+    for name, status, _ in hass_isy_data[ISY994_PROGRAMS][BINARY_SENSOR]:
         devices.append(ISYBinarySensorProgramEntity(name, status))
 
-    add_entities(devices)
+    await migrate_old_unique_ids(hass, BINARY_SENSOR, devices)
+    async_add_entities(devices)
 
 
 class ISYBinarySensorEntity(ISYNodeEntity, BinarySensorEntity):
@@ -132,7 +136,7 @@ class ISYBinarySensorEntity(ISYNodeEntity, BinarySensorEntity):
 
     Often times, a single device is represented by multiple nodes in the ISY,
     allowing for different nuances in how those devices report their on and
-    off events. This class turns those multiple nodes in to a single Home
+    off events. This class turns those multiple nodes into a single Home
     Assistant entity and handles both ways that ISY binary sensors can work.
     """
 
